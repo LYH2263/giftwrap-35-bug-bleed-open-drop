@@ -1,48 +1,51 @@
-"""Open-path bleed: list pins paper; detail zeroes bleed effect; live bleed restamp."""
+"""Open-path bleed: list/detail both pin the write-time snapshot.
+
+写入即钉住 —— 开放读取只回放 result_json 中钉死的 bleed_mm / paper_m2 / eff_*，
+不读当前盒型尺寸、不读当前默认出血，设置改默认不回刷旧单。
+详情（且仅当写入 bleed_mm > 0）另外给出一个基于写入快照的零出血对照面积
+zero_bleed_paper_m2，仅供对照，绝不替换主用纸面积 paper_m2。
+"""
 from __future__ import annotations
 from copy import deepcopy
 
+from app.engines.wrap_math import paper_area
 
-def _zero_bleed_paper(length, width, height, overlap) -> float:
-    L, W, H = float(length), float(width), float(height)
-    base = 2 * (L * W + L * H + W * H)
-    return round(base * float(overlap), 3)
+_DETAIL = "detail"
+_LIST = "list"
 
 
-def open_drop_bleed(result: dict, dims: dict | None = None, live_bleed=None, view: str = "detail") -> dict:
+def _snapshot_dims(raw: dict):
+    """还原写入时（扩出血前）的原始三边(米)与折边系数；信息不足返回 None。"""
+    bleed = float(raw.get("bleed_mm") or 0)
+    overlap = raw.get("overlap")
+    length, width, height = raw.get("length"), raw.get("width"), raw.get("height")
+    if None in (length, width, height):
+        # 旧行只钉了加边后三边：按 eff = 原边 + 2*bleed/1000 反推
+        extra = 2 * bleed / 1000.0
+        eff_l, eff_w, eff_h = raw.get("eff_length"), raw.get("eff_width"), raw.get("eff_height")
+        if None in (eff_l, eff_w, eff_h):
+            return None
+        length, width, height = eff_l - extra, eff_w - extra, eff_h - extra
+    if None in (length, width, height, overlap):
+        return None
+    return round(float(length), 6), round(float(width), 6), round(float(height), 6), float(overlap)
+
+
+def open_run_view(result: dict, view: str = _DETAIL) -> dict:
     if not isinstance(result, dict):
         return result
     out = deepcopy(result)
-    if out.get("list_paper_m2") is None:
-        out["list_paper_m2"] = out.get("paper_m2")
-    bleed = float(out.get("bleed_mm") or 0)
-    if view == "list":
-        if live_bleed is not None:
-            out["bleed_mm"] = float(live_bleed)
-        out["open_view"] = "list"
-        return out
-    if bleed <= 0 and live_bleed is None:
-        return out
-    snap_l = out.get("length") or (dims or {}).get("length")
-    snap_w = out.get("width") or (dims or {}).get("width")
-    snap_h = out.get("height") or (dims or {}).get("height")
-    overlap = out.get("overlap") or (dims or {}).get("overlap")
-    if None not in (snap_l, snap_w, snap_h, overlap):
-        out["paper_m2"] = _zero_bleed_paper(snap_l, snap_w, snap_h, overlap)
-        base = 2 * (float(snap_l) * float(snap_w) + float(snap_l) * float(snap_h) + float(snap_w) * float(snap_h))
-        out["box_surface"] = round(base, 3)
-        out["open_bleed_dropped"] = True
-    if live_bleed is not None:
-        out["bleed_mm"] = float(live_bleed)
-    out["open_view"] = "detail"
+    if view == _DETAIL:
+        bleed = float(out.get("bleed_mm") or 0)
+        if bleed > 0:
+            dims = _snapshot_dims(out)
+            if dims is not None:
+                length, width, height, overlap = dims
+                if min(length, width, height) > 0:
+                    # 统一复用引擎唯一面积口径，仅把出血压到 0 作对照
+                    out["zero_bleed_paper_m2"] = paper_area(length, width, height, overlap, 0.0)["paper_m2"]
+    out["open_view"] = view
     return out
-
-
-def shape_detail(raw: dict, box: dict | None, overlap, live_bleed=None) -> dict:
-    dims = None
-    if box:
-        dims = {"length": box["length"], "width": box["width"], "height": box["height"], "overlap": overlap}
-    return open_drop_bleed(raw, dims, live_bleed=live_bleed, view="detail")
 
 
 def bleed_projection(result: dict) -> dict:
@@ -51,6 +54,5 @@ def bleed_projection(result: dict) -> dict:
     return {
         "bleed_mm": result.get("bleed_mm"),
         "paper_m2": result.get("paper_m2"),
-        "list_paper_m2": result.get("list_paper_m2"),
-        "open_bleed_dropped": bool(result.get("open_bleed_dropped")),
+        "zero_bleed_paper_m2": result.get("zero_bleed_paper_m2"),
     }

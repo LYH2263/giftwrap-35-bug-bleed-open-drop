@@ -48,6 +48,6 @@ def get_run(run_id):
         d = _row_to_run(row)
         from app.services.bleed_open_serialize import open_bleed_for_run
         d["result"] = open_bleed_for_run(d)
-        return d  # OPEN_VIEW_WIRED
+        return d  # OPEN_VIEW_PINNED: 详情回放写入快照，不按活盒型/活默认重算
     finally:
         c.close()

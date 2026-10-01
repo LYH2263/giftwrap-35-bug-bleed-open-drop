@@ -14,6 +14,14 @@ def run_estimate(box_id: int, overlap: float | None, wrap_style: str, save: bool
         raise HTTPException(422, "bleed_mm must be >= 0")
     calc = paper_area(box["length"], box["width"], box["height"], ov, bleed)
     ribbon = ribbon_estimate(box["length"], box["width"], box["height"], wrap_style)
-    payload = {**calc, "ribbon": ribbon, "box_id": box_id}
+    # 钉入写入时原始三边，供详情零出血对照回放（开放路径不读活盒型）
+    payload = {
+        **calc,
+        "length": box["length"],
+        "width": box["width"],
+        "height": box["height"],
+        "ribbon": ribbon,
+        "box_id": box_id,
+    }
     run_id = history.insert_run(box_id, ov, payload, note, bleed) if save else None
     return {"box": box, "run_id": run_id, **calc, "ribbon": ribbon}

@@ -30,6 +30,9 @@ onMounted(async () => {
         <p v-if="run.result.eff_length != null" class="stat-line">
           加边后三边 {{ run.result.eff_length }} × {{ run.result.eff_width }} × {{ run.result.eff_height }} m
         </p>
+        <p v-if="run.result.zero_bleed_paper_m2 != null" class="stat-line">
+          零出血对照 {{ run.result.zero_bleed_paper_m2 }} m²（仅对照，非用纸面积）
+        </p>
         <p class="stat-line">写入时间 {{ run.created_at }}</p>
         <BoxUnfold
           v-if="run.result.eff_length != null"

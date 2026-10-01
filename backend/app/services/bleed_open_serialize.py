@@ -1,17 +1,16 @@
 from __future__ import annotations
-from app.repositories import boxes, settings_repo
-from app.services.bleed_open_view import shape_detail, open_drop_bleed
+from app.services.bleed_open_view import open_run_view
 
 
 def open_bleed_for_run(d: dict) -> dict:
-    box = boxes.get_box(d.get("box_id")) if d.get("box_id") else None
+    # 开放读取只回放写入快照：不读当前盒型、不读当前默认出血，改设置不回刷旧单。
     raw = d.get("result") or {}
     if isinstance(raw, dict) and raw.get("bleed_mm") is None and d.get("bleed_mm") is not None:
+        # 旧行兼容：result_json 缺 bleed_mm 时从列回填
         raw = dict(raw)
         raw["bleed_mm"] = d.get("bleed_mm")
-    live = settings_repo.get_bleed_mm() if hasattr(settings_repo, "get_bleed_mm") else None
-    return shape_detail(raw, box, d.get("overlap"), live_bleed=live)
+    return open_run_view(raw, view="detail")
 
 
 def open_bleed_list(raw: dict) -> dict:
-    return open_drop_bleed(raw, view="list")
+    return open_run_view(raw, view="list")
