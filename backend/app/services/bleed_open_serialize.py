@@ -1,17 +1,16 @@
 from __future__ import annotations
-from app.repositories import boxes, settings_repo
-from app.services.bleed_open_view import shape_detail, open_drop_bleed
+from app.services.bleed_open_view import pinned_open_view
 
 
 def open_bleed_for_run(d: dict) -> dict:
-    box = boxes.get_box(d.get("box_id")) if d.get("box_id") else None
     raw = d.get("result") or {}
     if isinstance(raw, dict) and raw.get("bleed_mm") is None and d.get("bleed_mm") is not None:
+        # 老数据 result_json 无出血字段：用落库列里写入时的 bleed_mm 钉回，
+        # 绝不读取当前设置里的默认出血（设置变基不得回刷旧编号）。
         raw = dict(raw)
         raw["bleed_mm"] = d.get("bleed_mm")
-    live = settings_repo.get_bleed_mm() if hasattr(settings_repo, "get_bleed_mm") else None
-    return shape_detail(raw, box, d.get("overlap"), live_bleed=live)
+    return pinned_open_view(raw)
 
 
 def open_bleed_list(raw: dict) -> dict:
-    return open_drop_bleed(raw, view="list")
+    return pinned_open_view(raw)
